@@ -124,7 +124,7 @@ double f_obj(const double * theta, const double ** x, const double ** masks,
       V(col).transpose()).cwiseProduct(mask).array().square().sum();
   }
   loss += lambda[0] * (eps * (inveps * D.array())
-    .unaryExpr(std::ptr_fun(gsl_sf_lncosh))).abs().sum();
+    .unaryExpr([](double x) { return gsl_sf_lncosh(x); })).abs().sum();
   for (int i = 0; i < D.rows(); i++) {
     loss += lambda[1] * sqrt(D.row(i).array().square().sum());
   }
