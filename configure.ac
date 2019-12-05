@@ -2,6 +2,8 @@ AC_INIT(mmpca, 1.0)
 AC_LANG(C++)
 AC_PROG_CXX
 
+AX_CXX_COMPILE_STDCXX_11()
+
 dnl Following lines kindly supplied by Dirk Eddelbuettel
 dnl Use gsl-config to find arguments for compiler and linker flags
 

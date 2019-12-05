@@ -1,6 +1,7 @@
 #include <R.h>
 #include <Rinternals.h>
 #include <R_ext/Utils.h>
+#include <R_ext/Rdynload.h>
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_multimin.h>
 #include <gsl/gsl_blas.h>
@@ -29,7 +30,7 @@ void minimize(double * theta, int * iter, int * status, char * msg,
     1);
   
   int status_iter;//, status_test;
-  int successes = 0;
+  //int successes = 0;
   for (*iter = 0; *iter < 20001; (*iter)++) {
     status_iter = gsl_multimin_fdfminimizer_iterate(s);
     if (trace && *iter % 10 == 0) {
@@ -108,7 +109,7 @@ void gsl_fd_obj(const gsl_vector * theta, void * params, double * f,
 
 int prep_indices_len(const int k, size_t n, const int * p) {
   int indices_len = 0;
-  for (int view = 0; view < n; view++) {
+  for (size_t view = 0; view < n; view++) {
     for (int j = 0; j < k && j < p[view]-1; j++) {
       for (int i = j+1; i < p[view]; i++) {
         indices_len += 3;
@@ -120,10 +121,10 @@ int prep_indices_len(const int k, size_t n, const int * p) {
 
 void prep_indices(double * indices, const int k, size_t n, const int * p) {
   int indices_len = 0;
-  for (int view = 0; view < n; view++) {
+  for (size_t view = 0; view < n; view++) {
     for (int j = 0; j < k && j < p[view]-1; j++) {
       for (int i = j+1; i < p[view]; i++) {
-        indices[indices_len++] = view;
+        indices[indices_len++] = (double) view;
         indices[indices_len++] = i;
         indices[indices_len++] = j;
       }
@@ -247,5 +248,21 @@ extern "C" {
   SEXP r_init_parallel() {
     init_parallel();
     return R_NilValue;
+  }
+
+  static const R_CallMethodDef callMethods[]  = {
+    {"r_obj", (DL_FUNC) &r_obj, 7},
+    {"r_grad", (DL_FUNC) &r_grad, 8},
+    {"r_vxi", (DL_FUNC) &r_vxi, 1},
+    {"r_optim", (DL_FUNC) &r_optim, 9},
+    {"r_inv_v", (DL_FUNC) &r_inv_v, 1},
+    {"r_init_parallel", (DL_FUNC) &r_init_parallel, 0},
+    {NULL, NULL, 0}
+  };
+
+  void R_init_mmpca(DllInfo *info) {
+    R_registerRoutines(info, NULL, callMethods, NULL, NULL);
+    R_useDynamicSymbols(info, FALSE);
+    R_forceSymbols(info, TRUE);
   }
 }
