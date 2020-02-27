@@ -1,13 +1,13 @@
-a5b26f48006c57b6c915455888c7b15a *DESCRIPTION
+f5c5f4a07b5086c8374c2b22e7075ddc *DESCRIPTION
 5463a1b63d1f382d70920ac223bf3e6a *NAMESPACE
 88200122f2104c8a6afbb9e0840f994c *R/c.R
 d6834f0023ba0b0feae0d68f90097467 *R/init.R
-7e78511e22325e3ac53f025363b1edea *R/mmpca.R
+da99b15dacf80aad17bba9d3ad0bb75a *R/mmpca.R
 682b55180c267a5ef232b3bd65df16ec *R/ref.R
 67c9db5dc1a8e12ccf5880ffe206ce56 *cleanup
 d8716d648ca9f849cf6f21215388e0b9 *configure
 0876d6cdebb21bbbcfdcf3c6521a18f3 *configure.ac
-a2ca0efeb324ad9291be20058a9f2ede *man/mmpca.Rd
+8292517be1879b6820c5ec1aded8d6d7 *man/mmpca.Rd
 0be8c47a1ec0716f6023159fae70b6f6 *src/Makevars.in
 bca00fdc668d4374d5cd8facec9a5ac7 *src/Makevars.win
 0ffb329ed41b30c9569055a6b585b551 *src/fdf.cpp

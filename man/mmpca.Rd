@@ -64,7 +64,7 @@ Analyzes several related matrices of data.
 \examples{
 x <- list(matrix(rnorm(110), 10, 11), matrix(rnorm(120), 10, 12))
 inds <- matrix(c(1, 1, 2, 3), 2, 2)
-result <- mmpca(x, inds, 3, parallel=FALSE)
+result <- mmpca(x, inds, 3, init_theta=FALSE, parallel=FALSE)
 }
 \author{
 Jonatan Kallus, \email{kallus@chalmers.se}

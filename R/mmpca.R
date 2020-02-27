@@ -53,7 +53,7 @@ source('R/c.R')
 #' @examples
 #' x <- list(matrix(rnorm(110), 10, 11), matrix(rnorm(120), 10, 12))
 #' inds <- matrix(c(1, 1, 2, 3), 2, 2)
-#' result <- mmpca(x, inds, 3, parallel=FALSE)
+#' result <- mmpca(x, inds, 3, init_theta=FALSE, parallel=FALSE)
 #'
 #' @author Jonatan Kallus, \email{kallus@@chalmers.se}
 #' @keywords pca models multivariate
@@ -122,6 +122,12 @@ mmpca <- function(x, inds, k, lambda=NULL, trace=0, init_theta=TRUE,
   cmf_result <- NULL
   if ((length(theta) == 0 && is.null(theta)) ||
       (length(theta) == 1 && theta)) { # find initial values xi and D
+    if (!requireNamespace('CMF', quietly=TRUE)) {
+      stop(paste('Package \"CMF\" needed to use CMF for initialization.',
+          'Install the package or disable initialization with CMF by setting',
+          'init_theta=FALSE.'),
+        call.=FALSE)
+    }
     if (trace) msg('Finding initial values... ')
     if (trace > 1) msg('\n')
     # set NA in data for CMF for missing data and test data
