@@ -15,7 +15,7 @@ test_lambda_selection <- function() {
   X[[3]] <- v[[3]][, 1:2] %*% t(v[[4]][, 3:4])
   X[[4]] <- v[[1]][, c(1, 3)] %*% t(v[[5]][, 1:2])
   X[[1]][matrix(runif(8*8), 8, 8) < 0.2] <- NA
-  mmpca::mmpca(X, inds, 3, 1, 1, 1)
+  mmpca::mmpca(X, inds, 3)
   # only checking for errors, not checking the result
   return(TRUE)
 }

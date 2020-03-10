@@ -1,6 +1,6 @@
 Package: mmpca
 Title: Integrative Analysis of Several Related Data Matrices
-Version: 1.0.3
+Version: 2.0.0
 Author: Jonatan Kallus [aut, cre]
 Maintainer: Jonatan Kallus <kallus@chalmers.se>
 Authors@R: person("Jonatan", "Kallus", email = "kallus@chalmers.se",
@@ -13,13 +13,12 @@ Description: A generalization of principal component analysis for integrative
   <arXiv:1911.04927>.
 Depends: R (>= 3.3.0)
 Imports: digest (>= 0.6.0), gsl (>= 1.9)
-Suggests: CMF (>= 1.0)
 LinkingTo: Rcpp, RcppEigen
 License: GPL-3
 LazyData: true
 NeedsCompilation: yes
 Encoding: UTF-8
 RoxygenNote: 6.0.0
-Packaged: 2020-02-26 16:32:54 UTC; jonatan
+Packaged: 2020-03-10 16:21:23 UTC; jonatan
 Repository: CRAN
-Date/Publication: 2020-02-27 10:00:02 UTC
+Date/Publication: 2020-03-10 16:40:02 UTC

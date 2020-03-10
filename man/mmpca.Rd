@@ -4,7 +4,7 @@
 \alias{mmpca}
 \title{Multiview principal component analysis}
 \usage{
-mmpca(x, inds, k, lambda = NULL, trace = 0, init_theta = TRUE,
+mmpca(x, inds, k, lambda = NULL, trace = 0, init_theta = NULL,
   cachepath = NULL, enable_rank_selection = TRUE, enable_sparsity = TRUE,
   enable_variable_selection = FALSE, parallel = TRUE)
 }
@@ -27,10 +27,12 @@ matrix where each column is the sequence \code{exp(seq(-6, 0)))}.}
 \item{trace}{Integer selecting the amount of log messages. 0 (default): no
 output, 3: all output.}
 
-\item{init_theta}{Boolean or numeric. TRUE (default) use collaborative
-matrix factorization (CMF) to find initial values. FALSE use initial
-values based on ordinary SVD. If init_theta is a numeric vector it is used
-as initial value.}
+\item{init_theta}{NULL, functions or numeric. NULL (default) use initial
+values based on ordinary SVD. If init_theta is a list of three functions
+(\code{CMF}, \code{matrix_to_triplets} and \code{getCMFopts} from package
+\code{CMF}) use the supplied functions to find initial values with
+collaborative matrix factorization (CMF). If init_theta is a numeric vector
+it is used as initial value.}
 
 \item{cachepath}{Character vector with path to directory to store
 intermediate results. If NULL (default) intermediate results are not
@@ -54,7 +56,8 @@ similar. Defaults to FALSE meaning this penalty is not used.}
 \value{
 A list with components
   \item{initial}{initial values used in optimization}
-  \item{cmf}{solution found with CMF (if init_theta == TRUE)}
+  \item{cmf}{solution found with CMF (if init_theta == c(CMF,
+    matrix_to_triplets, getCMFopts))}
   \item{training}{solutions for different values of lambda}
   \item{solution}{solution for optimal lambda value}
 }
@@ -64,7 +67,7 @@ Analyzes several related matrices of data.
 \examples{
 x <- list(matrix(rnorm(110), 10, 11), matrix(rnorm(120), 10, 12))
 inds <- matrix(c(1, 1, 2, 3), 2, 2)
-result <- mmpca(x, inds, 3, init_theta=FALSE, parallel=FALSE)
+result <- mmpca(x, inds, 3, parallel=FALSE)
 }
 \author{
 Jonatan Kallus, \email{kallus@chalmers.se}

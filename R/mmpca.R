@@ -25,10 +25,12 @@ source('R/c.R')
 #'   matrix where each column is the sequence \code{exp(seq(-6, 0)))}.
 #' @param trace Integer selecting the amount of log messages. 0 (default): no
 #'   output, 3: all output.
-#' @param init_theta Boolean or numeric. TRUE (default) use collaborative
-#'   matrix factorization (CMF) to find initial values. FALSE use initial
-#'   values based on ordinary SVD. If init_theta is a numeric vector it is used
-#'   as initial value.
+#' @param init_theta NULL, functions or numeric. NULL (default) use initial
+#'   values based on ordinary SVD. If init_theta is a list of three functions
+#'   (\code{CMF}, \code{matrix_to_triplets} and \code{getCMFopts} from package
+#'   \code{CMF}) use the supplied functions to find initial values with
+#'   collaborative matrix factorization (CMF). If init_theta is a numeric vector
+#'   it is used as initial value.
 #' @param cachepath Character vector with path to directory to store
 #'   intermediate results. If NULL (default) intermediate results are not
 #'   stored. For caching to work it is required that the random number
@@ -46,20 +48,21 @@ source('R/c.R')
 #'
 #' @return A list with components
 #'   \item{initial}{initial values used in optimization}
-#'   \item{cmf}{solution found with CMF (if init_theta == TRUE)}
+#'   \item{cmf}{solution found with CMF (if init_theta == c(CMF,
+#'     matrix_to_triplets, getCMFopts))}
 #'   \item{training}{solutions for different values of lambda}
 #'   \item{solution}{solution for optimal lambda value}
 #'
 #' @examples
 #' x <- list(matrix(rnorm(110), 10, 11), matrix(rnorm(120), 10, 12))
 #' inds <- matrix(c(1, 1, 2, 3), 2, 2)
-#' result <- mmpca(x, inds, 3, init_theta=FALSE, parallel=FALSE)
+#' result <- mmpca(x, inds, 3, parallel=FALSE)
 #'
 #' @author Jonatan Kallus, \email{kallus@@chalmers.se}
 #' @keywords pca models multivariate
 #'
 #' @export
-mmpca <- function(x, inds, k, lambda=NULL, trace=0, init_theta=TRUE,
+mmpca <- function(x, inds, k, lambda=NULL, trace=0, init_theta=NULL,
     cachepath=NULL, enable_rank_selection=TRUE, enable_sparsity=TRUE,
     enable_variable_selection=FALSE, parallel=TRUE) {
 
@@ -120,14 +123,9 @@ mmpca <- function(x, inds, k, lambda=NULL, trace=0, init_theta=TRUE,
 
   # find initial values
   cmf_result <- NULL
-  if ((length(theta) == 0 && is.null(theta)) ||
-      (length(theta) == 1 && theta)) { # find initial values xi and D
-    if (!requireNamespace('CMF', quietly=TRUE)) {
-      stop(paste('Package \"CMF\" needed to use CMF for initialization.',
-          'Install the package or disable initialization with CMF by setting',
-          'init_theta=FALSE.'),
-        call.=FALSE)
-    }
+  if (length(theta) == 3 && is.function(theta[[1]]) && is.function(theta[[2]])
+      && is.function(theta[[3]])) { # find initial values xi and D with CMF
+    cmf_fun <- theta
     if (trace) msg('Finding initial values... ')
     if (trace > 1) msg('\n')
     # set NA in data for CMF for missing data and test data
@@ -137,7 +135,7 @@ mmpca <- function(x, inds, k, lambda=NULL, trace=0, init_theta=TRUE,
       return(xx)
     })
     if (trace > 1) msg('CMF:\n')
-    cmf_result <- cmf_cached(x_cmf, inds, k, trace, cachepath)
+    cmf_result <- cmf_cached(x_cmf, inds, k, trace, cachepath, cmf_fun)
     # calculate training and test error of CMF
     cmf_result$loss <- sum(sapply(1:length(x), function(i) {
       U <- cmf_result$U[inds[i, ]]
@@ -178,7 +176,7 @@ mmpca <- function(x, inds, k, lambda=NULL, trace=0, init_theta=TRUE,
       msg(round(cmf_result$test_loss, 4))
       msg('\nOptimizing hyper parameters...\n')
     }
-  } else if (length(theta) == 1 && !theta) {
+  } else if (is.null(theta)) {
     V <- init_v(x, inds, k)
     singular_values <- init_singular_values(V, x, inds)
     D <- init_d(singular_values)
@@ -327,7 +325,7 @@ optim_mmpca_cached <- function(theta, x, masks, inds, k, p, lambda,
   return(res)
 }
 
-cmf_cached <- function(data, views, K, trace, path) {
+cmf_cached <- function(data, views, K, trace, path, cmf_fun) {
   hash <- digest::digest(list(data, views, K))
   if (!is.null(path)) {
     filename <- file.path(path, paste(hash, 'cmf', sep=':'))
@@ -336,7 +334,7 @@ cmf_cached <- function(data, views, K, trace, path) {
     }
   }
   # make sparsity factor have same magnitude
-  res <- cmf(data, views, K, trace)
+  res <- cmf(data, views, K, trace, cmf_fun)
   if (!is.null(path)) {
     saveRDS(res, filename)
   }
@@ -359,16 +357,16 @@ init_inv_v_cached <- function(v, path) {
   return(res)
 }
 
-cmf <- function(data, views, K, trace) {
+cmf <- function(data, views, K, trace, cmf_fun) {
   D <- rep(NA, max(views))
   for (i in 1:nrow(views)) {
     D[views[i, 1]] <- nrow(data[[i]])
     D[views[i, 2]] <- ncol(data[[i]])
   }
-  data <- lapply(data, CMF::matrix_to_triplets)
-  opts <- CMF::getCMFopts()
+  data <- lapply(data, cmf_fun[[2]])
+  opts <- cmf_fun[[3]]()
   opts$verbose <- trace - 1
-  CMF::CMF(data, views, K, rep('gaussian', length(data)), D, opts=opts)
+  cmf_fun[[1]](data, views, K, rep('gaussian', length(data)), D, opts=opts)
 }
 
 mmpca_lambda1 <- function(x, inds, k, lambda, nparallel, init=FALSE,
