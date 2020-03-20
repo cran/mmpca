@@ -1,6 +1,8 @@
 #include <RcppEigen.h>
 #include <gsl/gsl_sf_trig.h>
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 
 #include <iostream>
 using namespace std;
@@ -135,7 +137,9 @@ void d_obj(double * grad, const double * theta, const double ** x,
     const double ** masks, const double * lambda, const int k, const int * inds,
     const int * p, const int m, const int n, const int len,
     const double * indices, const int indices_len, const int num_threads) {
+#ifdef _OPENMP
   omp_set_num_threads(num_threads);
+#endif
   memset(grad, 0.0, sizeof(double) * len);
   int ix = 0;
   int * ixs = new int[n + 1];
