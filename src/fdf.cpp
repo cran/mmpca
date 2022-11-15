@@ -78,8 +78,8 @@ double f_obj(const double* theta, const std::vector<Eigen::Map<Eigen::MatrixXd>>
              const std::vector<Eigen::Map<Eigen::MatrixXd>>& masks,
              const Eigen::VectorXd& lambda, const int k, const Eigen::MatrixXi& inds,
              const Eigen::VectorXi& p, const int m, const int n,
-             const std::vector<std::size_t>& cidx) {
-  double loss = 0;
+             const std::vector<std::size_t>& cidx) {  
+  double loss = 0.0;
 
   Eigen::Map<const Eigen::MatrixXd> D(theta + cidx[n], k, n);
   Eigen::Array<Eigen::MatrixXd, Eigen::Dynamic, 1> V(n);
@@ -124,7 +124,7 @@ void d_obj(double* grad, const double* theta,
            const std::vector<Eigen::Map<Eigen::MatrixXd>>& masks,
            const Eigen::VectorXd& lambda, const int k, const Eigen::MatrixXi& inds,
            const Eigen::VectorXi& p, const int m, const int n, const int len,
-           const Eigen::MatrixXi& indices, const int num_threads,
+           const Eigen::MatrixXi& indices, const int n_threads,
            const std::vector<std::size_t>& cidx) {
   memset(grad, 0.0, sizeof(double) * len);
 

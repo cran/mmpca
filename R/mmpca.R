@@ -21,6 +21,7 @@
 #'   matrix where each column is the sequence \code{exp(seq(-6, 0)))}.
 #' @param trace Integer selecting the amount of log messages. 0 (default): no
 #'   output, 3: all output.
+#' @param max_iter Maximum number of iterations
 #' @param init_theta NULL, functions or numeric. NULL (default) use initial
 #'   values based on ordinary SVD. If init_theta is a list of three functions
 #'   (\code{CMF}, \code{matrix_to_triplets} and \code{getCMFopts} from package
@@ -37,7 +38,7 @@
 #' @param enable_sparsity Boolean deciding if the third penalty that imposes
 #'   sparsity in V should be enabled.
 #' @param enable_variable_selection Boolean deciding if the fourth penalty that
-#'   increases the tendence for sparsity structure of different V columns to be
+#'   increases the tendency for sparsity structure of different V columns to be
 #'   similar. Defaults to FALSE meaning this penalty is not used.
 #' @param parallel Boolean deciding if computations should be run on multiple
 #'   cores simultaneously.
@@ -50,20 +51,41 @@
 #'   \item{solution}{solution for optimal lambda value}
 #'
 #' @examples
-#' x <- list(matrix(rnorm(110), 10, 11), matrix(rnorm(120), 10, 12))
+#' # Create model with three views, two data matrices of low-rank 3
+#' max_rank <- 3
+#' v <- list(
+#'   qr.Q(qr(matrix(rnorm(10 * max_rank), 10, max_rank))),
+#'   qr.Q(qr(matrix(rnorm(11 * max_rank), 11, max_rank))),
+#'   qr.Q(qr(matrix(rnorm(12 * max_rank), 12, max_rank)))
+#' )
+#' d <- matrix(
+#'   c(1, 1, 1, 1, 1, 0, 1, 0, 1),
+#'   nrow = max_rank, ncol = 3
+#' )
+#' x <- list(
+#'   v[[1]] %*% diag(d[, 1] * d[, 2]) %*% t(v[[2]]),
+#'   v[[1]] %*% diag(d[, 1] * d[, 3]) %*% t(v[[3]])
+#' )
 #' inds <- matrix(c(1, 1, 2, 3), 2, 2)
-#' result <- mmpca(x, inds, 3, parallel=FALSE)
+#' result <- mmpca::mmpca(
+#'   x, inds, max_rank, parallel = FALSE,
+#'   lambda = c(1e-3, 1e-5), enable_sparsity = FALSE,
+#'   trace = 3
+#' )
+#' # Investigate the solution
+#' result$solution$D
 #'
 #' @author Jonatan Kallus, \email{kallus@@chalmers.se}
 #' @keywords pca models multivariate
 #'
 #' @export
-mmpca <- function(x, inds, k, lambda = NULL, trace = 0, init_theta = NULL,
-    cachepath = NULL, enable_rank_selection = TRUE, enable_sparsity = TRUE,
-    enable_variable_selection = FALSE, parallel = TRUE) {
+mmpca <- function(x, inds, k, lambda = NULL, trace = 0, max_iter = 20000,
+    init_theta = NULL, cachepath = NULL, enable_rank_selection = TRUE,
+    enable_sparsity = TRUE, enable_variable_selection = FALSE,
+    parallel = TRUE) {
 
   if (enable_variable_selection && !enable_sparsity) {
-    stop("Variable selection can not be enabled when sparisty is not enabled.")
+    stop("Variable selection can not be enabled when sparsity is not enabled.")
   }
 
   nparam <- 2 + enable_sparsity + enable_variable_selection
@@ -97,30 +119,43 @@ mmpca <- function(x, inds, k, lambda = NULL, trace = 0, init_theta = NULL,
 
   # missing values, training set and test set
   missing_masks <- lapply(x, function(x) !is.na(x))
-  for (i in seq_along(x)) x[[i]][is.na(x[[i]])] <- 0
-  train_masks <- lapply(x,
-    function(x) 0.9 > matrix(stats::runif(prod(dim(x))), nrow(x), ncol(x)))
+  for (i in seq_along(x)) {
+    x[[i]][is.na(x[[i]])] <- 0
+  }
+  train_masks <- lapply(x, function(x) {
+    0.9 > matrix(stats::runif(prod(dim(x))), nrow(x), ncol(x))
+  })
   test_masks <- lapply(train_masks, function(x) !x)
-  train_masks <- lapply(seq_along(x),
-    function(i) 1 * (train_masks[[i]] & missing_masks[[i]]))
-  test_masks <- lapply(seq_along(x),
-    function(i) 1 * (test_masks[[i]] & missing_masks[[i]]))
+  train_masks <- lapply(seq_along(x), function(i) {
+    1 * (train_masks[[i]] & missing_masks[[i]])
+  })
+  test_masks <- lapply(seq_along(x), function(i) {
+    1 * (test_masks[[i]] & missing_masks[[i]])
+  })
   missing_masks <- lapply(seq_along(x), function(i) 1 * missing_masks[[i]])
 
   # rescale data so that biggest sing val is pi^2
   # factor is used to scale found D before returning
+
+  # NOTE: This is done after filling missing values with zeros
   max_sing_val <- max(sapply(x, function(x) svd(x)$d[1]))
   data_scale_factor <- pi^2 / max_sing_val
   x <- lapply(x, function(x) x * data_scale_factor)
 
   # find scaling factor for lambda
-  lambda_factor <- mean(sapply(seq_along(x),
-    function(i) sqrt(sum((x[[i]] * train_masks[[i]])^2))))^(3 / 2)
+  lambda_factor <- mean(sapply(seq_along(x), function(i) {
+    sqrt(sum((x[[i]] * train_masks[[i]])^2))
+  }))^(3 / 2)
 
   # find initial values
   cmf_result <- NULL
-  if (length(theta) == 3 && is.function(theta[[1]]) && is.function(theta[[2]])
-      && is.function(theta[[3]])) { # find initial values xi and D with CMF
+  if (
+    length(theta) == 3
+    && is.function(theta[[1]])
+    && is.function(theta[[2]])
+    && is.function(theta[[3]])
+  ) {
+    # find initial values xi and D with CMF
     cmf_fun <- theta
     if (trace) msg("Finding initial values... ")
     if (trace > 1) msg("\n")
@@ -200,12 +235,14 @@ mmpca <- function(x, inds, k, lambda = NULL, trace = 0, init_theta = NULL,
       if (trace > 1) {
         msg("lambda: ", lambda, "\n")
       }
-      c_init_parallel()
+      if (parallel) {
+        c_init_parallel()
+      }
       res <- optim_mmpca_cached(theta, x, train_masks, inds, k, p, lambda,
-        lambda_factor, trace > 2, cachepath, 1)
+        lambda_factor, max_iter, trace > 2, cachepath, 1)
       # change small values to exact zeros in D
       theta <- res[[1]]
-      ix <- (1+sum(p*k)):length(theta)
+      ix <- (1 + sum(p * k)):length(theta)
       theta[ix][abs(theta[ix]) < 1e-5] <- 0
       res[[1]] <- theta
       loss <- c_objective(theta, x, test_masks, inds, k, p,
@@ -213,26 +250,37 @@ mmpca <- function(x, inds, k, lambda = NULL, trace = 0, init_theta = NULL,
       if (trace > 0) {
         msg("lambda: ", lambda, " -> test loss: ", loss, "\n")
       }
-      return(list(value=loss,
-        extra=list(lambda=lambda, theta=theta, loss=loss, res=res)))
+
+      list(
+        value = loss,
+        extra = list(
+          lambda = lambda,
+          theta = theta,
+          loss = loss,
+          res = res
+        )
+      )
     }
 
     if (parallel) {
       c_init_parallel()
-      tmp_res <- parallel::mclapply(1:nrow(lambda), function(i) L(lambda[i, ]),
-        mc.preschedule=FALSE)
+      tmp_res <- parallel::mclapply(
+        seq_len(nrow(lambda)),
+        function(i) L(lambda[i, ]),
+        mc.preschedule = FALSE
+      )
     } else {
-      tmp_res <- lapply(1:nrow(lambda), function(i) L(lambda[i, ]))
+      tmp_res <- lapply(seq_len(nrow(lambda)), function(i) L(lambda[i, ]))
     }
 
-    for (i in 1:length(tmp_res)) {
+    for (i in seq_along(tmp_res)) {
       results[[i]] <- tmp_res[[i]]$extra
     }
 
     if (trace) msg("Postprocessing solutions... ")
     solutions <- list()
     losses <- rep(NA, length(results))
-    for (i in 1:length(results)) {
+    for (i in seq_along(results)) {
       r <- results[[i]]
       losses[i] <- r$loss
       res <- r$res
@@ -255,7 +303,7 @@ mmpca <- function(x, inds, k, lambda = NULL, trace = 0, init_theta = NULL,
   if (trace) msg("Calculating final solution using all data... ")
   if (trace > 1) msg("\n")
   res <- optim_mmpca_cached(theta, x, missing_masks, inds, k, p, lambda,
-    lambda_factor, trace > 1, cachepath,
+    lambda_factor, max_iter, trace > 1, cachepath,
     ifelse(parallel, parallel::detectCores(), 1))
   # change small values to exact zeros in D
   theta <- res[[1]]
@@ -311,7 +359,7 @@ mmpca <- function(x, inds, k, lambda = NULL, trace = 0, init_theta = NULL,
 }
 
 optim_mmpca_cached <- function(theta, x, masks, inds, k, p, lambda,
-    lambda_factor, trace, path, nparallel) {
+    lambda_factor, max_iter, trace, path, nparallel) {
   hash <- digest::digest(list(x, masks, inds, k, p, lambda_factor))
   lambda_str <- paste(lambda, collapse = "_")
   if (!is.null(path)) {
@@ -328,8 +376,19 @@ optim_mmpca_cached <- function(theta, x, masks, inds, k, p, lambda,
       factor[4] <- 1 / length(p)
     }
   }
-  res <- c_optim_mmpca(theta, x, masks, inds, k, p,
-    lambda * lambda_factor * factor, trace, nparallel)
+  res <- c_optim_mmpca(
+    theta,
+    x,
+    masks,
+    inds,
+    k,
+    p,
+    lambda * lambda_factor * factor,
+    max_iter,
+    trace,
+    nparallel
+  )
+
   if (!is.null(path)) {
     saveRDS(res, filename)
   }
@@ -381,7 +440,7 @@ cmf <- function(data, views, K, trace, cmf_fun) {
 }
 
 mmpca_lambda1 <- function(x, inds, k, lambda, nparallel, init = FALSE,
-    trace = FALSE) {
+    max_iter = 20000, trace = FALSE) {
   result <- list()
   p <- init_view_dimensions(x, inds)
 
@@ -408,8 +467,9 @@ mmpca_lambda1 <- function(x, inds, k, lambda, nparallel, init = FALSE,
       msg("lambda: ", lambda[i], "\n")
     }
 
-    res <- c_optim_mmpca(theta, x, masks, inds, k, p, lambda[i], trace,
-      nparallel)
+    res <- c_optim_mmpca(
+      theta, x, masks, inds, k, p, lambda[i], max_iter, trace, nparallel
+    )
     #res <- ref_optim_mmpca(theta, x, inds, k, p, lambda[i], trace)
     theta <- res[[1]]
     xiD <- ref_unvectorize(theta, k, length(p), p)
